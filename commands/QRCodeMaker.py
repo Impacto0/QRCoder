@@ -53,10 +53,10 @@ from ..apper import apper
 from .. import config
 
 # Defaults
-BLOCK = '.5 in'
-HEIGHT = '.25 in'
-BASE = '.25 in'
-MESSAGE = 'https://tapnair.github.io/QRCoder/'
+BLOCK = '0'
+HEIGHT = '0'
+BASE = '0'
+MESSAGE = 'example message'
 
 # File assumed to be in script root directory
 FILE_NAME = 'QR-17x.csv'
@@ -74,7 +74,7 @@ def get_target_body(sketch_point):
         return None
 
 
-def make_real_geometry(target_body: adsk.fusion.BRepBody, temp_body: adsk.fusion.BRepBody):
+def make_real_geometry(target_body: adsk.fusion.BRepBody, temp_body: adsk.fusion.BRepBody, separate_body: bool):
     ao = apper.AppObjects()
 
     if target_body is None:
@@ -82,16 +82,20 @@ def make_real_geometry(target_body: adsk.fusion.BRepBody, temp_body: adsk.fusion
     else:
         component = target_body.parentComponent
 
+    if temp_body is None:
+        return
+
     base_feature = component.features.baseFeatures.add()
     base_feature.startEdit()
     component.bRepBodies.add(temp_body, base_feature)
     base_feature.finishEdit()
 
-    if target_body is not None:
-        tools = adsk.core.ObjectCollection.create()
-        tools.add(base_feature.bodies.item(0))
-        combine_input = component.features.combineFeatures.createInput(component.bRepBodies.item(0), tools)
-        component.features.combineFeatures.add(combine_input)
+    if not separate_body:
+        if target_body is not None:
+            tools = adsk.core.ObjectCollection.create()
+            tools.add(base_feature.bodies.item(0))
+            combine_input = component.features.combineFeatures.createInput(component.bRepBodies.item(0), tools)
+            component.features.combineFeatures.add(combine_input)
 
 
 def clear_graphics(graphics_group: adsk.fusion.CustomGraphicsGroup):
@@ -113,6 +117,9 @@ def get_qr_temp_geometry(qr_data, input_values):
     height: float = input_values['block_height']
     base: float = input_values['base_height']
     sketch_point: adsk.fusion.SketchPoint = input_values['sketch_point'][0]
+    
+    if side <= 0 or height <= 0 or base < 0:
+        return None
 
     x_dir = sketch_point.parentSketch.xDirection
     x_dir.normalize()
@@ -213,9 +220,9 @@ def make_qr_from_message(input_values):
     if use_user_size:
         args['version'] = user_size
     if mode != 'Automatic':
-        args['mode'] = mode
+        args['mode'] = mode.lower()
     if error_type != 'Automatic':
-        args['error'] = error_type
+        args['error'] = error_type[0]
 
     success = apper.check_dependency('pyqrcode', config.lib_path)
 
@@ -228,26 +235,26 @@ def add_make_inputs(inputs: adsk.core.CommandInputs):
     drop_style = adsk.core.DropDownStyles.TextListDropDownStyle
     inputs.addStringValueInput('message', 'Value to encode', MESSAGE)
 
-    inputs.addBoolValueInput('use_user_size', 'Specify size?', True, '', False)
-    size_spinner = inputs.addIntegerSpinnerCommandInput('user_size', 'QR Code Size (Version)', 1, 40, 1, 5)
+    inputs.addBoolValueInput('use_user_size', 'Specify version', True, '', False)
+    size_spinner = inputs.addIntegerSpinnerCommandInput('user_size', 'Version', 1, 40, 1, 5)
     size_spinner.isEnabled = False
     size_spinner.isVisible = False
 
     mode_drop_down = inputs.addDropDownCommandInput('mode', 'Encoding Mode', drop_style)
     mode_items = mode_drop_down.listItems
     mode_items.add('Automatic', True, '')
-    mode_items.add('alphanumeric', False, '')
-    mode_items.add('numeric', False, '')
-    mode_items.add('binary', False, '')
-    mode_items.add('kanji', False, '')
+    mode_items.add('Alphanumeric', False, '')
+    mode_items.add('Numeric', False, '')
+    mode_items.add('Binary', False, '')
+    mode_items.add('Kanji', False, '')
 
-    error_input = inputs.addDropDownCommandInput('error_type', 'Encoding Mode', drop_style)
+    error_input = inputs.addDropDownCommandInput('error_type', 'Error correction', drop_style)
     error_items = error_input.listItems
     error_items.add('Automatic', True, '')
-    error_items.add('L', False, '')
-    error_items.add('M', False, '')
-    error_items.add('Q', False, '')
-    error_items.add('H', False, '')
+    error_items.add('L (Low, 7% redundant)', False, '')
+    error_items.add('M (Medium, 15% redundant)', False, '')
+    error_items.add('Q (Quartile, 25% redundant)', False, '')
+    error_items.add('H (High, 30% redundant)', False, '')
 
 
 def add_csv_inputs(inputs: adsk.core.CommandInputs):
@@ -279,11 +286,10 @@ class QRCodeMaker(apper.Fusion360CommandBase):
     def __init__(self, name: str, options: dict):
         super().__init__(name, options)
         # self.graphics_group = None
-        self.make_preview = True
+        self.make_preview = False
         self.is_make_qr = options.get('is_make_qr', False)
 
     def on_input_changed(self, command, inputs, changed_input, input_values):
-        self.make_preview = True
         if changed_input.id == 'use_user_size':
             if input_values['use_user_size']:
                 inputs.itemById('user_size').isEnabled = True
@@ -296,6 +302,8 @@ class QRCodeMaker(apper.Fusion360CommandBase):
             file_name = browse_for_csv()
             if len(file_name) > 0:
                 inputs.itemById('file_name').value = file_name
+        elif changed_input.id == 'live_preview':
+                self.make_preview = input_values['live_preview']
 
     def on_preview(self, command, inputs, args, input_values):
         if self.make_preview:
@@ -315,11 +323,12 @@ class QRCodeMaker(apper.Fusion360CommandBase):
                 target_body = get_target_body(input_values['sketch_point'][0])
 
                 # TODO Why is custom graphics so slow?
-                make_real_geometry(target_body, temp_body)
+                make_real_geometry(target_body, temp_body, input_values['separate_body'])
                 # make_graphics(t_body, self.graphics_group)
                 args.isValidResult = True
 
-            self.make_preview = False
+            if not input_values['live_preview']:
+                self.make_preview = False
 
     def on_execute(self, command, inputs, args, input_values):
         # sketch_point: adsk.fusion.SketchPoint = input_values['sketch_point'][0]
@@ -335,7 +344,7 @@ class QRCodeMaker(apper.Fusion360CommandBase):
     def on_create(self, command, inputs):
         ao = apper.AppObjects()
         # self.graphics_group = ao.root_comp.customGraphicsGroups.add()
-        self.make_preview = True
+        self.make_preview = False
 
         default_block_size = adsk.core.ValueInput.createByString(BLOCK)
         default_block_height = adsk.core.ValueInput.createByString(HEIGHT)
@@ -348,6 +357,9 @@ class QRCodeMaker(apper.Fusion360CommandBase):
         inputs.addValueInput('block_size', 'QR Block Size', default_units, default_block_size)
         inputs.addValueInput('block_height', 'QR Block Height', default_units, default_block_height)
         inputs.addValueInput('base_height', 'Base Height (Can be zero)', default_units, default_base_height)
+
+        inputs.addBoolValueInput('live_preview', 'Live preview', True, '', False)
+        inputs.addBoolValueInput('separate_body', 'Generate as separate body', True, '', False)
 
         group_input = inputs.addGroupCommandInput('group', 'QR Code Definition')
 
