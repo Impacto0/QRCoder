@@ -1,3 +1,5 @@
+# Fork of [QRCoder](https://github.com/tapnair/QRCoder) that fixes a issue with installing pyqrcode library
+
 QRCoder
 =======
 Generate 3D geometry for a QR Code.
@@ -43,7 +45,7 @@ A value of 1 indicates that the block should be created for this position.
 
 Installation
 ------------
-- `Download or clone the latest version <https://github.com/tapnair/QRCoder/archive/refs/heads/master.zip>`_
+- `Download or clone the latest version <https://github.com/Impacto0/QRCoder/archive/refs/heads/master.zip>`_
 - Unzip the archive to a permanent location on your computer
 - It is important that the directory be named *QRCoder*.
 

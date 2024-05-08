@@ -1,3 +1,5 @@
+# Fork of [QRCoder](https://github.com/tapnair/QRCoder) that fixes a issue with installing pyqrcode library
+
 ![image](./resources/tapnair_github_io_QRCoder.png)
 
 QRCoder
@@ -40,7 +42,7 @@ The format should be 1's and 0's. A value of 1 indicates that the block should b
 Installation
 ------------
 
--   [Download or clone the latest version](https://github.com/tapnair/QRCoder/archive/refs/heads/master.zip)
+-   [Download or clone the latest version](https://github.com/Impacto0/QRCoder/archive/refs/heads/master.zip)
 -   Unzip the archive to a permanent location on your computer
 -   It is important that the directory be named *QRCoder*.
 
