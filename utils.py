@@ -5,7 +5,7 @@ import zipfile
 import adsk.core
 
 REPO = 'apper'
-REPO_URL = 'https://github.com/tapnair/apper/archive/master.zip'
+REPO_URL = 'https://github.com/Impacto0/apper/archive/master.zip'
 
 from . import config
 
